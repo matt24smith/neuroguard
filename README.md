@@ -1,2 +1,2 @@
 Hello world! 
-Ggithub page for neuroguard. More info here soon
+Github page for neuroguard. More info here soon
