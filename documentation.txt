@@ -24,6 +24,9 @@ October 20-21
    +Ordered tools
       -Multimeter
 
+   +Conducted research on data storage solutions for sensor data
+
    Topics for further research:
       -power supply cable vs. 9v
+      
 
