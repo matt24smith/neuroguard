@@ -1,0 +1,29 @@
+October 20-21
+   +Conducted research on sensor and controller hardware for the purposes of purchasing the correct hardware
+      -Learned about arrangement of resistors in parallel and in series configurations
+      -Learned about arrangement of capacitors in parallel and series configurations
+      -Researched accelerometers compatible with the arduino platform
+      -Researched gyroscopic sensors compatible with arduino
+      -Researched linear instrumentation amplifiers for clean EEG readings without excessive noise
+
+   +Ordered parts
+      -Gyroscopic sensor
+      -Accelerometer sensor
+      -Breadboard
+      -Development board
+      -Jumper wires
+      -Capacitors
+      -Resistors
+      -Power supply units
+      -Instrumentation amplifier
+      -Quad op amps
+      -Multiplexers
+      -Buzzer element
+      -Potentiometers
+   
+   +Ordered tools
+      -Multimeter
+
+   Topics for further research:
+      -power supply cable vs. 9v
+
