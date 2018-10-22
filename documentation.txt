@@ -25,8 +25,10 @@ October 20-21
       -Multimeter
 
    +Conducted research on data storage solutions for sensor data
+      -Accel / gyro data -> vectors
 
    Topics for further research:
       -power supply cable vs. 9v
+      -storing EEG readings data
       
 
