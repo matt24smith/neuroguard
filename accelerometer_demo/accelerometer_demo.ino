@@ -51,10 +51,10 @@ MPU6050 mpu;
 
 // note: pulse width modulation (PWM) on pins 3, 5, 6, 9, 10, and 11
 
-#define LED_PIN 13 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
+#define LED_PIN 13
 #define GREEN_LED 10
 #define RED_LED 11
-#define BLUE_LED 13
+#define BLUE_LED 3
 
 #define INTERRUPT_PIN 2
 
@@ -168,7 +168,7 @@ int gyro2led (float value) {
  /* normalizer to convert yaw/pitch/roll to rgb */
 
   value *= (180/M_PI); //magic
-  value /= 0.705;
+//  value /= 0.705;
   
   return int(abs(value));
 } 
