@@ -32,3 +32,8 @@ October 20-21
       -storing EEG readings data
       
 
+October 25-26
+   +Assembled first prototype
+      -completed gyroscope+accel "hello world" program
+      -normalized data and output to RGB 
+
