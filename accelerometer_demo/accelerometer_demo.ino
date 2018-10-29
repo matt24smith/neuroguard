@@ -6,7 +6,7 @@
 // Arduino Wire library is required if I2Cdev I2CDEV_ARDUINO_WIRE implementation
 // is used in I2Cdev.h
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
-    #include "Wire.h"
+#include "Wire.h"
 #endif
 
 // class default I2C address is 0x68
@@ -22,41 +22,34 @@ MPU6050 mpu;
 // on a remote host such as Processing or something though)
 //#define OUTPUT_READABLE_QUATERNION
 
-// uncomment "OUTPUT_READABLE_EULER" if you want to see Euler angles
-// (in degrees) calculated from the quaternions coming from the FIFO.
-// Note that Euler angles suffer from gimbal lock (for more info, see
-// http://en.wikipedia.org/wiki/Gimbal_lock)
-//#define OUTPUT_READABLE_EULER
-
-// uncomment "OUTPUT_READABLE_YAWPITCHROLL" if you want to see the yaw/
-// pitch/roll angles (in degrees) calculated from the quaternions coming
-// from the FIFO. Note this also requires gravity vector calculations.
-// Also note that yaw/pitch/roll angles suffer from gimbal lock (for
-// more info, see: http://en.wikipedia.org/wiki/Gimbal_lock)
-//#define OUTPUT_READABLE_YAWPITCHROLL
-
-// uncomment "OUTPUT_READABLE_REALACCEL" if you want to see acceleration
-// components with gravity removed. This acceleration reference frame is
-// not compensated for orientation, so +X is always +X according to the
-// sensor, just without the effects of gravity. If you want acceleration
-// compensated for orientation, us OUTPUT_READABLE_WORLDACCEL instead.
-//#define OUTPUT_READABLE_REALACCEL
-
-// uncomment "OUTPUT_READABLE_WORLDACCEL" if you want to see acceleration
-// components with gravity removed and adjusted for the world frame of
-// reference (yaw is relative to initial orientation, since no magnetometer
-// is present in this case). Could be quite handy in some cases.
-//#define OUTPUT_READABLE_WORLDACCEL
-
+//#define OUTPUT_READABLE_EULER  // beware gimbal lock
+//#define OUTPUT_READABLE_YAWPITCHROLL  // beware gimbal lock
+//#define OUTPUT_READABLE_REALACCEL  // = accel - gravity
+//#define OUTPUT_READABLE_WORLDACCEL  // = (accel - gravity) + adjustment
+//#define OUTPUT_RGB_VALUES
+#define OUTPUT_BTNTOGGLE
 
 // note: pulse width modulation (PWM) on pins 3, 5, 6, 9, 10, and 11
 
-#define LED_PIN 13
-#define GREEN_LED 10
-#define RED_LED 11
-#define BLUE_LED 3
+const int LED_PIN = 13;
+const int GREEN_LED = 10;
+const int RED_LED = 11;
+const int BLUE_LED = 3;
 
-#define INTERRUPT_PIN 2
+//#define RGB_R A2
+//#define RGB_G A3
+//#define RGB_B A1
+
+const int RGB_R = 6;
+const int RGB_B = 5;
+const int RGB_G = 9;
+
+#define BUTTON_PIN A0
+bool toggled = false;
+int oldButtonState = LOW;
+int newButtonState = LOW;
+
+const int INTERRUPT_PIN = 2;
 
 bool blinkState = false;
 
@@ -84,7 +77,7 @@ float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gra
 
 volatile bool mpuInterrupt = false;     // indicates whether MPU interrupt pin has gone high
 void dmpDataReady() {
-    mpuInterrupt = true;
+  mpuInterrupt = true;
 }
 
 
@@ -94,221 +87,257 @@ void dmpDataReady() {
 // ================================================================
 
 void setup() {
-    // join I2C bus (I2Cdev library doesn't do this automatically)
-    #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
-        Wire.begin();
-        //Wire.setClock(400000); :( // 400kHz I2C clock. Comment this line if having compilation difficulties
-    #elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
-        Fastwire::setup(400, true);
-    #endif
+  // join I2C bus (I2Cdev library doesn't do this automatically)
+#if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
+  Wire.begin();
+  //Wire.setClock(400000); :( // 400kHz I2C clock. Comment this line if having compilation difficulties
+#elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
+  Fastwire::setup(400, true);
+#endif
 
-    // initialize serial communication
-    Serial.begin(115200);
-    while (!Serial); // wait for Leonardo enumeration, others continue immediately
+  // initialize serial communication
+  Serial.begin(115200);
+  while (!Serial); // wait for Leonardo enumeration, others continue immediately
 
-    // initialize device
-    Serial.println(F("Initializing I2C devices..."));
-    mpu.initialize();
-    pinMode(INTERRUPT_PIN, INPUT);
+  // initialize device
+  Serial.println(F("Initializing I2C devices..."));
+  mpu.initialize();
+  pinMode(INTERRUPT_PIN, INPUT);
 
-    // verify connection
-    Serial.println(F("Testing device connections..."));
-    Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
+  // verify connection
+  Serial.println(F("Testing device connections..."));
+  Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
 
-    // wait for ready // or dont
-//    Serial.println(F("\nSend any character to begin DMP programming and demo: "));
-//    while (Serial.available() && Serial.read()); // empty buffer
-//    while (!Serial.available());                 // wait for data
-//    while (Serial.available() && Serial.read()); // empty buffer again
+  // wait for ready // or dont
+  //    Serial.println(F("\nSend any character to begin DMP programming and demo: "));
+  //    while (Serial.available() && Serial.read()); // empty buffer
+  //    while (!Serial.available());                 // wait for data
+  //    while (Serial.available() && Serial.read()); // empty buffer again
 
-    // load and configure the DMP
-    Serial.println(F("Initializing DMP..."));
-    devStatus = mpu.dmpInitialize();
+  // load and configure the DMP
+  Serial.println(F("Initializing DMP..."));
+  devStatus = mpu.dmpInitialize();
 
-    // gyro offsets
-    mpu.setXGyroOffset(0); //220 
-    mpu.setYGyroOffset(0);  //76
-    mpu.setZGyroOffset(0); //-85
-    mpu.setZAccelOffset(0); // 1688 factory default ? 
+  // gyro offsets
+  mpu.setXGyroOffset(0); //220
+  mpu.setYGyroOffset(0);  //76
+  mpu.setZGyroOffset(0); //-85
+  mpu.setZAccelOffset(0); // 1688 factory default ?
 
-    // make sure it worked (returns 0 if so)
-    if (devStatus == 0) {
-        Serial.println(F("Enabling DMP..."));
-        mpu.setDMPEnabled(true);
+  // make sure it worked (returns 0 if so)
+  if (devStatus == 0) {
+    Serial.println(F("Enabling DMP..."));
+    mpu.setDMPEnabled(true);
 
-        Serial.print(F("Enabling interrupt detection (Arduino external interrupt "));
-        Serial.print(digitalPinToInterrupt(INTERRUPT_PIN));
-        Serial.println(F(")..."));
-        attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
-        mpuIntStatus = mpu.getIntStatus();
+    Serial.print(F("Enabling interrupt detection (Arduino external interrupt "));
+    Serial.print(digitalPinToInterrupt(INTERRUPT_PIN));
+    Serial.println(F(")..."));
+    attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
+    mpuIntStatus = mpu.getIntStatus();
 
-        Serial.println(F("DMP ready! Waiting for first interrupt..."));
-        dmpReady = true;
+    Serial.println(F("DMP ready! Waiting for first interrupt..."));
+    dmpReady = true;
 
-        // get expected DMP packet size for later comparison
-        packetSize = mpu.dmpGetFIFOPacketSize();
-    } else {
-        // ERROR!
-        // 1 = initial memory load failed
-        // 2 = DMP configuration updates failed
-        // (if it's going to break, usually the code will be 1)
-        Serial.print(F("DMP Initialization failed (code "));
-        Serial.print(devStatus);
-        Serial.println(F(")"));
-    }
+    // get expected DMP packet size for later comparison
+    packetSize = mpu.dmpGetFIFOPacketSize();
+  } else {
+    // ERROR!
+    // 1 = initial memory load failed
+    // 2 = DMP configuration updates failed
+    // (if it's going to break, usually the code will be 1)
+    Serial.print(F("DMP Initialization failed (code "));
+    Serial.print(devStatus);
+    Serial.println(F(")"));
+  }
 
-    // configure LED for output
-    pinMode(LED_PIN, OUTPUT);
-    pinMode(GREEN_LED, OUTPUT);
-    pinMode(RED_LED, OUTPUT);
-    pinMode(BLUE_LED, OUTPUT);
+  // configure LED for output
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(GREEN_LED, OUTPUT);
+  pinMode(RED_LED, OUTPUT);
+  pinMode(BLUE_LED, OUTPUT);
+
+  pinMode(RGB_R, OUTPUT);
+  pinMode(RGB_G, OUTPUT);
+  pinMode(RGB_B, OUTPUT);
+
+  pinMode(BUTTON_PIN, INPUT);
 }
 
-int gyro2led (float value) {
- /* normalizer to convert yaw/pitch/roll to rgb */
+int quaternion2rgb (float value) {
+  return int(abs(value * 254));
+}
 
-  value *= (180/M_PI); //magic
-//  value /= 0.705;
-  
+int ypr2rgb (float value) {
+  /* normalizer to convert yaw/pitch/roll to rgb */
+
+  value *= (180 / M_PI); //magic
+  //  value /= 0.705;
+  //  value *= -1;
+  //  value += 180;
+
   return int(abs(value));
-} 
+}
 
 // ================================================================
 // ===                    MAIN PROGRAM LOOP                     ===
 // ================================================================
 
 void loop() {
-    // if programming failed, don't try to do anything
-    if (!dmpReady) return;
+  // if programming failed, don't try to do anything
+  if (!dmpReady) return;
 
-    // wait for MPU interrupt or extra packet(s) available
-    while (!mpuInterrupt && fifoCount < packetSize) {
-        if (mpuInterrupt && fifoCount < packetSize) {
-          // try to get out of the infinite loop 
-          fifoCount = mpu.getFIFOCount();
-        }  
-        // other program behavior stuff here
-        // .
-        // .
-        // .
-        // if you are really paranoid you can frequently test in between other
-        // stuff to see if mpuInterrupt is true, and if so, "break;" from the
-        // while() loop to immediately process the MPU data
-        // .
-        // .
-        // .
-
+  // wait for MPU interrupt or extra packet(s) available
+  while (!mpuInterrupt && fifoCount < packetSize) {
+    if (mpuInterrupt && fifoCount < packetSize) {
+      // try to get out of the infinite loop
+      fifoCount = mpu.getFIFOCount();
     }
+    // other program behavior stuff here
+    // .
+    // .
+    // .
+    // if you are really paranoid you can frequently test in between other
+    // stuff to see if mpuInterrupt is true, and if so, "break;" from the
+    // while() loop to immediately process the MPU data
+    // .
+    // .
+    // .
+    newButtonState = analogRead(BUTTON_PIN);
+    if (newButtonState >= 500 && oldButtonState <= 500) {
+      toggled = !toggled;
+      #ifdef OUTPUT_BTNTOGGLE
+            Serial.print("Button Toggled\t");
+            Serial.println(analogRead(BUTTON_PIN));
+      #endif
+      
+    }
+    oldButtonState = newButtonState;
 
-    // reset interrupt flag and get INT_STATUS byte
-    mpuInterrupt = false;
-    mpuIntStatus = mpu.getIntStatus();
+  }
 
-    // get current FIFO count
+  // reset interrupt flag and get INT_STATUS byte
+  mpuInterrupt = false;
+  mpuIntStatus = mpu.getIntStatus();
+
+  // get current FIFO count
+  fifoCount = mpu.getFIFOCount();
+
+  // check for overflow (this should never happen)
+  if ((mpuIntStatus & _BV(MPU6050_INTERRUPT_FIFO_OFLOW_BIT)) || fifoCount >= 1024) {
+    // reset so we can continue cleanly
+    mpu.resetFIFO();
     fifoCount = mpu.getFIFOCount();
-
-    // check for overflow (this should never happen)
-    if ((mpuIntStatus & _BV(MPU6050_INTERRUPT_FIFO_OFLOW_BIT)) || fifoCount >= 1024) {
-        // reset so we can continue cleanly
-        mpu.resetFIFO();
-        fifoCount = mpu.getFIFOCount();
-        Serial.println(F("FIFO overflow!"));
+    Serial.println(F("FIFO overflow!"));
 
     // otherwise, check for DMP data ready interrupt (this should happen frequently)
-    } else if (mpuIntStatus & _BV(MPU6050_INTERRUPT_DMP_INT_BIT)) {
-        // wait for correct available data length, should be a VERY short wait
-        while (fifoCount < packetSize) fifoCount = mpu.getFIFOCount();
+  } else if (mpuIntStatus & _BV(MPU6050_INTERRUPT_DMP_INT_BIT)) {
+    // wait for correct available data length, should be a VERY short wait
+    while (fifoCount < packetSize) fifoCount = mpu.getFIFOCount();
 
-        // read a packet from FIFO
-        mpu.getFIFOBytes(fifoBuffer, packetSize);
-        
-        // track FIFO count here in case there is > 1 packet available
-        // (this lets us immediately read more without waiting for an interrupt)
-        fifoCount -= packetSize;
+    // read a packet from FIFO
+    mpu.getFIFOBytes(fifoBuffer, packetSize);
 
-        #ifdef OUTPUT_READABLE_QUATERNION
-            // display quaternion values in easy matrix form: w x y z
-            mpu.dmpGetQuaternion(&q, fifoBuffer);
-            Serial.print("quat\t");
-            Serial.print(q.w);
-            Serial.print("\t");
-            Serial.print(q.x);
-            Serial.print("\t");
-            Serial.print(q.y);
-            Serial.print("\t");
-            Serial.println(q.z);
-        #endif
+    // track FIFO count here in case there is > 1 packet available
+    // (this lets us immediately read more without waiting for an interrupt)
+    fifoCount -= packetSize;
 
-        #ifdef OUTPUT_READABLE_EULER
-            // display Euler angles in degrees
-            mpu.dmpGetQuaternion(&q, fifoBuffer);
-            mpu.dmpGetEuler(euler, &q);
-            Serial.print("euler\t");
-            Serial.print(euler[0] * 180/M_PI);
-            Serial.print("\t");
-            Serial.print(euler[1] * 180/M_PI);
-            Serial.print("\t");
-            Serial.println(euler[2] * 180/M_PI);
-        #endif
+#ifdef OUTPUT_READABLE_QUATERNION
+    // display quaternion values in easy matrix form: w x y z
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
+    Serial.print("quat\t");
+    Serial.print(q.w);
+    Serial.print("\t");
+    Serial.print(q.x);
+    Serial.print("\t");
+    Serial.print(q.y);
+    Serial.print("\t");
+    Serial.println(q.z);
+#endif
 
-        #ifdef OUTPUT_READABLE_YAWPITCHROLL
-            // display Euler angles in degrees
-            mpu.dmpGetQuaternion(&q, fifoBuffer);
-            mpu.dmpGetGravity(&gravity, &q);
-            mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-            Serial.print("ypr\t");
-            Serial.print(ypr[0] * 180/M_PI);
-            Serial.print("\t");
-            Serial.print(ypr[1] * 180/M_PI);
-            Serial.print("\t");
-            Serial.println(ypr[2] * 180/M_PI);
-        #endif
+#ifdef OUTPUT_READABLE_EULER
+    // display Euler angles in degrees
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
+    mpu.dmpGetEuler(euler, &q);
+    Serial.print("euler\t");
+    Serial.print(euler[0] * 180 / M_PI);
+    Serial.print("\t");
+    Serial.print(euler[1] * 180 / M_PI);
+    Serial.print("\t");
+    Serial.println(euler[2] * 180 / M_PI);
+#endif
 
-        #ifdef OUTPUT_READABLE_REALACCEL
-            // display real acceleration, adjusted to remove gravity
-            mpu.dmpGetQuaternion(&q, fifoBuffer);
-            mpu.dmpGetAccel(&aa, fifoBuffer);
-            mpu.dmpGetGravity(&gravity, &q);
-            mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
-            Serial.print("areal\t");
-            Serial.print(aaReal.x);
-            Serial.print("\t");
-            Serial.print(aaReal.y);
-            Serial.print("\t");
-            Serial.println(aaReal.z);
-        #endif
+#ifdef OUTPUT_READABLE_YAWPITCHROLL
+    // display Euler angles in degrees
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
+    mpu.dmpGetGravity(&gravity, &q);
+    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+    Serial.print("ypr\t");
+    Serial.print(ypr[0] * 180 / M_PI);
+    Serial.print("\t");
+    Serial.print(ypr[1] * 180 / M_PI);
+    Serial.print("\t");
+    Serial.println(ypr[2] * 180 / M_PI);
+#endif
 
-        #ifdef OUTPUT_READABLE_WORLDACCEL
-            // display initial world-frame acceleration, adjusted to remove gravity
-            // and rotated based on known orientation from quaternion
-            mpu.dmpGetQuaternion(&q, fifoBuffer);
-            mpu.dmpGetAccel(&aa, fifoBuffer);
-            mpu.dmpGetGravity(&gravity, &q);
-            mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
-            mpu.dmpGetLinearAccelInWorld(&aaWorld, &aaReal, &q);
-            Serial.print("aworld\t");
-            Serial.print(aaWorld.x);
-            Serial.print("\t");
-            Serial.print(aaWorld.y);
-            Serial.print("\t");
-            Serial.println(aaWorld.z);
-        #endif
+#ifdef OUTPUT_READABLE_REALACCEL
+    // display real acceleration, adjusted to remove gravity
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
+    mpu.dmpGetAccel(&aa, fifoBuffer);
+    mpu.dmpGetGravity(&gravity, &q);
+    mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
+    Serial.print("areal\t");
+    Serial.print(aaReal.x);
+    Serial.print("\t");
+    Serial.print(aaReal.y);
+    Serial.print("\t");
+    Serial.println(aaReal.z);
+#endif
 
-        mpu.dmpGetQuaternion(&q, fifoBuffer);
-        mpu.dmpGetGravity(&gravity, &q);
-        mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-        Serial.print("ypr\t");
-        Serial.print(gyro2led(ypr[0]));
-        Serial.print("\t");
-        Serial.print(gyro2led(ypr[1]));
-        Serial.print("\t");
-        Serial.println(gyro2led(ypr[2]));
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
+    mpu.dmpGetGravity(&gravity, &q);
+    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
 
-        // blink LED to indicate activity
-        blinkState = !blinkState;
-        //digitalWrite(LED_PIN, blinkState);
-        analogWrite(RED_LED, gyro2led(ypr[0]));
-        analogWrite(GREEN_LED, gyro2led(ypr[1]));
-        analogWrite(BLUE_LED, gyro2led(ypr[2]));
+#ifdef OUTPUT_RGB_VALUES
+    Serial.print("ypr\t");
+    Serial.print(ypr2rgb(ypr[0]));
+    Serial.print("\t");
+    Serial.print(ypr2rgb(ypr[1]));
+    Serial.print("\t");
+    Serial.print(ypr2rgb(ypr[2]));
+    Serial.print("\tQs:\t");
+    Serial.print(quaternion2rgb(q.w));
+    Serial.print("\t");
+    Serial.print(quaternion2rgb(q.x));
+    Serial.print("\t");
+    Serial.print(quaternion2rgb(q.y));
+    Serial.print("\t");
+    Serial.print(quaternion2rgb(q.z));
+    Serial.print("\t");
+#endif
+
+    // blink LED to indicate activity
+    blinkState = !blinkState;
+
+    //digitalWrite(LED_PIN, blinkState);
+
+    if (!toggled) {
+      analogWrite(RED_LED, ypr2rgb(ypr[0]));
+      analogWrite(GREEN_LED, ypr2rgb(ypr[1]));
+      analogWrite(BLUE_LED, ypr2rgb(ypr[2]));
+      analogWrite(RGB_R, 0);
+      analogWrite(RGB_G, 0);
+      analogWrite(RGB_B, 0);
     }
+    else {
+      analogWrite(RGB_R, quaternion2rgb(q.w) + (quaternion2rgb(q.z) / 3));
+      analogWrite(RGB_G, quaternion2rgb(q.x));
+      analogWrite(RGB_B, quaternion2rgb(q.y));
+      analogWrite(RED_LED, 0);
+      analogWrite(GREEN_LED, 0);
+      analogWrite(BLUE_LED, 0);
+    }
+
+    Serial.println(analogRead(BUTTON_PIN));
+
+  }
 }

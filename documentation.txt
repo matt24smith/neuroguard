@@ -37,3 +37,9 @@ October 25-26
       -completed gyroscope+accel "hello world" program
       -normalized data and output to RGB 
 
+
+October 27-28
+   +Researched quaternions 
+
+   +Implemented quaternion-based spatial computation
+      -LED demonstration with push button toggle
