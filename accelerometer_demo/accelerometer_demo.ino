@@ -1,14 +1,11 @@
 #include "I2Cdev.h"
-
 #include "MPU6050_6Axis_MotionApps20.h"
 //#include "MPU6050.h" // not necessary if using MotionApps include file
-
 // Arduino Wire library is required if I2Cdev I2CDEV_ARDUINO_WIRE implementation
 // is used in I2Cdev.h
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
 #include "Wire.h"
 #endif
-
 // class default I2C address is 0x68
 // specific I2C addresses may be passed as a parameter here
 // AD0 low = 0x68 (default for SparkFun breakout and InvenSense evaluation board)
@@ -16,18 +13,12 @@
 MPU6050 mpu;
 //MPU6050 mpu(0x69); // <-- use for AD0 high
 
-
-// uncomment "OUTPUT_READABLE_QUATERNION" if you want to see the actual
-// quaternion components in a [w, x, y, z] format (not best for parsing
-// on a remote host such as Processing or something though)
 //#define OUTPUT_READABLE_QUATERNION
-
 //#define OUTPUT_READABLE_EULER  // beware gimbal lock
 //#define OUTPUT_READABLE_YAWPITCHROLL  // beware gimbal lock
 //#define OUTPUT_READABLE_REALACCEL  // = accel - gravity
 //#define OUTPUT_READABLE_WORLDACCEL  // = (accel - gravity) + adjustment
 //#define OUTPUT_RGB_VALUES
-#define OUTPUT_BTNTOGGLE
 
 // note: pulse width modulation (PWM) on pins 3, 5, 6, 9, 10, and 11
 
@@ -35,23 +26,16 @@ const int LED_PIN = 13;
 const int GREEN_LED = 10;
 const int RED_LED = 11;
 const int BLUE_LED = 3;
-
-//#define RGB_R A2
-//#define RGB_G A3
-//#define RGB_B A1
-
 const int RGB_R = 6;
 const int RGB_B = 5;
 const int RGB_G = 9;
-
-#define BUTTON_PIN A0
-bool toggled = false;
-int oldButtonState = LOW;
-int newButtonState = LOW;
-
 const int INTERRUPT_PIN = 2;
+const int BUTTON_PIN = A0;
 
-bool blinkState = false;
+int buttonState = 0;
+bool toggled = false;
+bool toggling = false;
+
 
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
@@ -71,6 +55,7 @@ float euler[3];         // [psi, theta, phi]    Euler angle container
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 
 
+
 // ================================================================
 // ===               INTERRUPT DETECTION ROUTINE                ===
 // ================================================================
@@ -81,6 +66,24 @@ void dmpDataReady() {
 }
 
 
+// ================================================================
+// ===                     DATA MODIFIERS                       ===
+// ================================================================
+
+int quaternion2rgb (float value) {
+  return int(abs(value * 255));
+}
+
+int q2rgb(Quaternion q) {
+
+  return 1;
+}
+
+int ypr2rgb (float value) {
+  value *= (180 / M_PI); //magic
+  return int(abs(value));
+}
+
 
 // ================================================================
 // ===                      INITIAL SETUP                       ===
@@ -90,19 +93,26 @@ void setup() {
   // join I2C bus (I2Cdev library doesn't do this automatically)
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
   Wire.begin();
-  //Wire.setClock(400000); :( // 400kHz I2C clock. Comment this line if having compilation difficulties
+  Wire.setClock(400000); //:( // 400kHz I2C clock. Comment this line if having compilation difficulties
 #elif I2CDEV_IMPLEMENTATION == I2CDEV_BUILTIN_FASTWIRE
   Fastwire::setup(400, true);
 #endif
 
   // initialize serial communication
   Serial.begin(115200);
-  while (!Serial); // wait for Leonardo enumeration, others continue immediately
 
   // initialize device
   Serial.println(F("Initializing I2C devices..."));
   mpu.initialize();
   pinMode(INTERRUPT_PIN, INPUT);
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(GREEN_LED, OUTPUT);
+  pinMode(RED_LED, OUTPUT);
+  pinMode(BLUE_LED, OUTPUT);
+  pinMode(RGB_R, OUTPUT);
+  pinMode(RGB_G, OUTPUT);
+  pinMode(RGB_B, OUTPUT);
+  pinMode(BUTTON_PIN, INPUT);
 
   // verify connection
   Serial.println(F("Testing device connections..."));
@@ -149,34 +159,8 @@ void setup() {
     Serial.print(devStatus);
     Serial.println(F(")"));
   }
-
-  // configure LED for output
-  pinMode(LED_PIN, OUTPUT);
-  pinMode(GREEN_LED, OUTPUT);
-  pinMode(RED_LED, OUTPUT);
-  pinMode(BLUE_LED, OUTPUT);
-
-  pinMode(RGB_R, OUTPUT);
-  pinMode(RGB_G, OUTPUT);
-  pinMode(RGB_B, OUTPUT);
-
-  pinMode(BUTTON_PIN, INPUT);
 }
 
-int quaternion2rgb (float value) {
-  return int(abs(value * 254));
-}
-
-int ypr2rgb (float value) {
-  /* normalizer to convert yaw/pitch/roll to rgb */
-
-  value *= (180 / M_PI); //magic
-  //  value /= 0.705;
-  //  value *= -1;
-  //  value += 180;
-
-  return int(abs(value));
-}
 
 // ================================================================
 // ===                    MAIN PROGRAM LOOP                     ===
@@ -202,17 +186,30 @@ void loop() {
     // .
     // .
     // .
-    newButtonState = analogRead(BUTTON_PIN);
-    if (newButtonState >= 500 && oldButtonState <= 500) {
+    buttonState = digitalRead(BUTTON_PIN);
+    if (buttonState == HIGH && toggling == false) {
+      toggling = true;
       toggled = !toggled;
-      #ifdef OUTPUT_BTNTOGGLE
-            Serial.print("Button Toggled\t");
-            Serial.println(analogRead(BUTTON_PIN));
-      #endif
-      
+    } else if (buttonState == LOW && toggling == true) {
+      toggling = false;
     }
-    oldButtonState = newButtonState;
 
+    if (!toggled) {
+      analogWrite(RED_LED, ypr2rgb(ypr[0]));
+      analogWrite(GREEN_LED, ypr2rgb(ypr[1]));
+      analogWrite(BLUE_LED, ypr2rgb(ypr[2]));
+      analogWrite(RGB_R, 0);
+      analogWrite(RGB_G, 0);
+      analogWrite(RGB_B, 0);
+    }
+    else {
+      analogWrite(RGB_R, quaternion2rgb(q.w) + (quaternion2rgb(q.z) / 3));
+      analogWrite(RGB_G, quaternion2rgb(q.x));
+      analogWrite(RGB_B, quaternion2rgb(q.y));
+      analogWrite(RED_LED, 0);
+      analogWrite(GREEN_LED, 0);
+      analogWrite(BLUE_LED, 0);
+    }
   }
 
   // reset interrupt flag and get INT_STATUS byte
@@ -241,9 +238,13 @@ void loop() {
     // (this lets us immediately read more without waiting for an interrupt)
     fifoCount -= packetSize;
 
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
+    mpu.dmpGetGravity(&gravity, &q);
+    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+
+
 #ifdef OUTPUT_READABLE_QUATERNION
     // display quaternion values in easy matrix form: w x y z
-    mpu.dmpGetQuaternion(&q, fifoBuffer);
     Serial.print("quat\t");
     Serial.print(q.w);
     Serial.print("\t");
@@ -256,7 +257,6 @@ void loop() {
 
 #ifdef OUTPUT_READABLE_EULER
     // display Euler angles in degrees
-    mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetEuler(euler, &q);
     Serial.print("euler\t");
     Serial.print(euler[0] * 180 / M_PI);
@@ -268,9 +268,6 @@ void loop() {
 
 #ifdef OUTPUT_READABLE_YAWPITCHROLL
     // display Euler angles in degrees
-    mpu.dmpGetQuaternion(&q, fifoBuffer);
-    mpu.dmpGetGravity(&gravity, &q);
-    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
     Serial.print("ypr\t");
     Serial.print(ypr[0] * 180 / M_PI);
     Serial.print("\t");
@@ -281,9 +278,7 @@ void loop() {
 
 #ifdef OUTPUT_READABLE_REALACCEL
     // display real acceleration, adjusted to remove gravity
-    mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetAccel(&aa, fifoBuffer);
-    mpu.dmpGetGravity(&gravity, &q);
     mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
     Serial.print("areal\t");
     Serial.print(aaReal.x);
@@ -292,10 +287,6 @@ void loop() {
     Serial.print("\t");
     Serial.println(aaReal.z);
 #endif
-
-    mpu.dmpGetQuaternion(&q, fifoBuffer);
-    mpu.dmpGetGravity(&gravity, &q);
-    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
 
 #ifdef OUTPUT_RGB_VALUES
     Serial.print("ypr\t");
@@ -314,30 +305,5 @@ void loop() {
     Serial.print(quaternion2rgb(q.z));
     Serial.print("\t");
 #endif
-
-    // blink LED to indicate activity
-    blinkState = !blinkState;
-
-    //digitalWrite(LED_PIN, blinkState);
-
-    if (!toggled) {
-      analogWrite(RED_LED, ypr2rgb(ypr[0]));
-      analogWrite(GREEN_LED, ypr2rgb(ypr[1]));
-      analogWrite(BLUE_LED, ypr2rgb(ypr[2]));
-      analogWrite(RGB_R, 0);
-      analogWrite(RGB_G, 0);
-      analogWrite(RGB_B, 0);
-    }
-    else {
-      analogWrite(RGB_R, quaternion2rgb(q.w) + (quaternion2rgb(q.z) / 3));
-      analogWrite(RGB_G, quaternion2rgb(q.x));
-      analogWrite(RGB_B, quaternion2rgb(q.y));
-      analogWrite(RED_LED, 0);
-      analogWrite(GREEN_LED, 0);
-      analogWrite(BLUE_LED, 0);
-    }
-
-    Serial.println(analogRead(BUTTON_PIN));
-
   }
 }
