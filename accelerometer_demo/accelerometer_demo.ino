@@ -1,3 +1,13 @@
+/**
+ * neuroguard V1.2
+ * 
+ * author: matt smith
+ * 
+ * code loosely based off a very nice sensor demo by jeff rowberg
+ * https://github.com/jrowberg/i2cdevlib/
+ * 
+**/
+
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
 //#include "MPU6050.h" // not necessary if using MotionApps include file
@@ -26,9 +36,7 @@ const int LED_PIN = 13;
 const int GREEN_LED = 10;
 const int RED_LED = 11;
 const int BLUE_LED = 3;
-const int RGB_R = 6;
-const int RGB_B = 5;
-const int RGB_G = 9;
+const int WHITE_LED = 5;
 const int INTERRUPT_PIN = 2;
 const int BUTTON_PIN = A0;
 
@@ -36,6 +44,7 @@ int buttonState = 0;
 bool toggled = false;
 bool toggling = false;
 
+int r, g, b;
 
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
@@ -70,18 +79,59 @@ void dmpDataReady() {
 // ===                     DATA MODIFIERS                       ===
 // ================================================================
 
-int quaternion2rgb (float value) {
-  return int(abs(value * 255));
+void quaternion2rgb () {
+  /* yaw, pitch, roll -> red, green, blue LEDs*/
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
+    mpu.dmpGetGravity(&gravity, &q);
+    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+
+    float rgb[3] = {ypr[0], ypr[1], ypr[2]};
+    int rgbInt[3];
+  
+    for (int i = 0; i < 3; i++){
+      rgb[i] *= (180 / M_PI); //magic
+      rgbInt[i] = int(abs(rgb[i]))  ;
+    }
+
+    #ifdef OUTPUT_RGB_VALUES
+        Serial.print("Rd: ");
+        Serial.print(rgbInt[0]);
+        Serial.print("\tGr: ");
+        Serial.print(rgbInt[1]);
+        Serial.print("\tBl: ");
+        Serial.println(rgbInt[2]);
+    #endif
+    
+    analogWrite(RED_LED, rgbInt[0]);
+    analogWrite(GREEN_LED, rgbInt[1]);
+    analogWrite(BLUE_LED, rgbInt[2]);
+    analogWrite(WHITE_LED, 0);
 }
 
-int q2rgb(Quaternion q) {
+void aaWorld2led () {
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
+    mpu.dmpGetAccel(&aa, fifoBuffer);
+    mpu.dmpGetGravity(&gravity, &q);
+    mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
+    mpu.dmpGetLinearAccelInWorld(&aaWorld, &aaReal, &q);
 
-  return 1;
-}
+    float delta = abs(aaWorld.x / 28.0) - 25;
+    if (delta < 0) {
+      delta = 0;
+    }
+    else if (delta > 255) {
+      delta = 255;
+    }
 
-int ypr2rgb (float value) {
-  value *= (180 / M_PI); //magic
-  return int(abs(value));
+    #ifdef OUTPUT_RGB_VALUES
+        Serial.print("Wh: ");
+        Serial.println(delta);
+    #endif
+
+    analogWrite(WHITE_LED, int(delta));
+    analogWrite(RED_LED, 0);
+    analogWrite(GREEN_LED, 0);
+    analogWrite(BLUE_LED, 0);
 }
 
 
@@ -109,9 +159,10 @@ void setup() {
   pinMode(GREEN_LED, OUTPUT);
   pinMode(RED_LED, OUTPUT);
   pinMode(BLUE_LED, OUTPUT);
-  pinMode(RGB_R, OUTPUT);
-  pinMode(RGB_G, OUTPUT);
-  pinMode(RGB_B, OUTPUT);
+//  pinMode(RGB_R, OUTPUT);
+//  pinMode(RGB_G, OUTPUT);
+//  pinMode(RGB_B, OUTPUT);
+  pinMode(WHITE_LED, OUTPUT);
   pinMode(BUTTON_PIN, INPUT);
 
   // verify connection
@@ -194,21 +245,11 @@ void loop() {
       toggling = false;
     }
 
-    if (!toggled) {
-      analogWrite(RED_LED, ypr2rgb(ypr[0]));
-      analogWrite(GREEN_LED, ypr2rgb(ypr[1]));
-      analogWrite(BLUE_LED, ypr2rgb(ypr[2]));
-      analogWrite(RGB_R, 0);
-      analogWrite(RGB_G, 0);
-      analogWrite(RGB_B, 0);
+    if (toggled) {
+      quaternion2rgb();
     }
     else {
-      analogWrite(RGB_R, quaternion2rgb(q.w) + (quaternion2rgb(q.z) / 3));
-      analogWrite(RGB_G, quaternion2rgb(q.x));
-      analogWrite(RGB_B, quaternion2rgb(q.y));
-      analogWrite(RED_LED, 0);
-      analogWrite(GREEN_LED, 0);
-      analogWrite(BLUE_LED, 0);
+      aaWorld2led();
     }
   }
 
@@ -238,13 +279,9 @@ void loop() {
     // (this lets us immediately read more without waiting for an interrupt)
     fifoCount -= packetSize;
 
-    mpu.dmpGetQuaternion(&q, fifoBuffer);
-    mpu.dmpGetGravity(&gravity, &q);
-    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-
-
 #ifdef OUTPUT_READABLE_QUATERNION
     // display quaternion values in easy matrix form: w x y z
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
     Serial.print("quat\t");
     Serial.print(q.w);
     Serial.print("\t");
@@ -257,6 +294,7 @@ void loop() {
 
 #ifdef OUTPUT_READABLE_EULER
     // display Euler angles in degrees
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetEuler(euler, &q);
     Serial.print("euler\t");
     Serial.print(euler[0] * 180 / M_PI);
@@ -267,7 +305,10 @@ void loop() {
 #endif
 
 #ifdef OUTPUT_READABLE_YAWPITCHROLL
-    // display Euler angles in degrees
+  // display Euler angles in degrees
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
+    mpu.dmpGetGravity(&gravity, &q);
+    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
     Serial.print("ypr\t");
     Serial.print(ypr[0] * 180 / M_PI);
     Serial.print("\t");
@@ -278,7 +319,9 @@ void loop() {
 
 #ifdef OUTPUT_READABLE_REALACCEL
     // display real acceleration, adjusted to remove gravity
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetAccel(&aa, fifoBuffer);
+    mpu.dmpGetGravity(&gravity, &q);
     mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
     Serial.print("areal\t");
     Serial.print(aaReal.x);
@@ -288,22 +331,20 @@ void loop() {
     Serial.println(aaReal.z);
 #endif
 
-#ifdef OUTPUT_RGB_VALUES
-    Serial.print("ypr\t");
-    Serial.print(ypr2rgb(ypr[0]));
+#ifdef OUTPUT_READABLE_WORLDACCEL
+    // display initial world-frame acceleration, adjusted to remove gravity
+    // and rotated based on known orientation from quaternion
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
+    mpu.dmpGetAccel(&aa, fifoBuffer);
+    mpu.dmpGetGravity(&gravity, &q);
+    mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
+    mpu.dmpGetLinearAccelInWorld(&aaWorld, &aaReal, &q);
+    Serial.print("aworld\t");
+    Serial.print(aaWorld.x);
     Serial.print("\t");
-    Serial.print(ypr2rgb(ypr[1]));
+    Serial.print(aaWorld.y);
     Serial.print("\t");
-    Serial.print(ypr2rgb(ypr[2]));
-    Serial.print("\tQs:\t");
-    Serial.print(quaternion2rgb(q.w));
-    Serial.print("\t");
-    Serial.print(quaternion2rgb(q.x));
-    Serial.print("\t");
-    Serial.print(quaternion2rgb(q.y));
-    Serial.print("\t");
-    Serial.print(quaternion2rgb(q.z));
-    Serial.print("\t");
+    Serial.println(aaWorld.z);
 #endif
   }
 }
