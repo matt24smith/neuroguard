@@ -80,7 +80,9 @@ void dmpDataReady() {
 // ================================================================
 
 void quaternion2rgb () {
-  /* yaw, pitch, roll -> red, green, blue LEDs*/
+  /* yaw, pitch, roll -> red, green, blue LEDs
+https://math.stackexchange.com/questions/970094/convert-a-linear-scale-to-a-logarithmic-scale
+  */
     mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetGravity(&gravity, &q);
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
@@ -89,8 +91,10 @@ void quaternion2rgb () {
     int rgbInt[3];
   
     for (int i = 0; i < 3; i++){
-      rgb[i] *= (180 / M_PI); //magic
-      rgbInt[i] = int(abs(rgb[i]))  ;
+      rgb[i] = abs(rgb[i]);
+      rgb[i] += 1;
+      rgb[i] = pow(rgb[i], 4.20) / 1.54619; // exponential growth function
+      rgbInt[i] = int(rgb[i]);
     }
 
     #ifdef OUTPUT_RGB_VALUES
@@ -99,7 +103,13 @@ void quaternion2rgb () {
         Serial.print("\tGr: ");
         Serial.print(rgbInt[1]);
         Serial.print("\tBl: ");
-        Serial.println(rgbInt[2]);
+        Serial.print(rgbInt[2]);
+        Serial.print("\t\tRAW\t ");
+        Serial.print(ypr[0]);
+        Serial.print("\t ");
+        Serial.print(ypr[1]);
+        Serial.print("\t ");
+        Serial.println(ypr[2]);
     #endif
     
     analogWrite(RED_LED, rgbInt[0]);

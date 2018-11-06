@@ -43,3 +43,11 @@ October 27-28
 
    +Implemented quaternion-based spatial computation
       -LED demonstration with push button toggle
+
+
+October 30
+   +Added white LED for demonstrating acceleration
+
+
+November 5
+   +Exponential growth function applied to positional RGB data for simpler demonstrations
