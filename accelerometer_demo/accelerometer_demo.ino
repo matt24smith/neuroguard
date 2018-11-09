@@ -1,5 +1,5 @@
 /**
- * neuroguard V1.2
+ * neuroguard V1.3
  * 
  * author: matt smith
  * 
@@ -115,7 +115,7 @@ https://math.stackexchange.com/questions/970094/convert-a-linear-scale-to-a-loga
     analogWrite(RED_LED, rgbInt[0]);
     analogWrite(GREEN_LED, rgbInt[1]);
     analogWrite(BLUE_LED, rgbInt[2]);
-    analogWrite(WHITE_LED, 0);
+//    analogWrite(WHITE_LED, 0);
 }
 
 void aaWorld2led () {
@@ -139,9 +139,9 @@ void aaWorld2led () {
     #endif
 
     analogWrite(WHITE_LED, int(delta));
-    analogWrite(RED_LED, 0);
-    analogWrite(GREEN_LED, 0);
-    analogWrite(BLUE_LED, 0);
+//    analogWrite(RED_LED, 0);
+//    analogWrite(GREEN_LED, 0);
+//    analogWrite(BLUE_LED, 0);
 }
 
 
@@ -169,9 +169,6 @@ void setup() {
   pinMode(GREEN_LED, OUTPUT);
   pinMode(RED_LED, OUTPUT);
   pinMode(BLUE_LED, OUTPUT);
-//  pinMode(RGB_R, OUTPUT);
-//  pinMode(RGB_G, OUTPUT);
-//  pinMode(RGB_B, OUTPUT);
   pinMode(WHITE_LED, OUTPUT);
   pinMode(BUTTON_PIN, INPUT);
 
@@ -247,20 +244,20 @@ void loop() {
     // .
     // .
     // .
-    buttonState = digitalRead(BUTTON_PIN);
-    if (buttonState == HIGH && toggling == false) {
-      toggling = true;
-      toggled = !toggled;
-    } else if (buttonState == LOW && toggling == true) {
-      toggling = false;
-    }
-
-    if (toggled) {
+//    buttonState = digitalRead(BUTTON_PIN);
+//    if (buttonState == HIGH && toggling == false) {
+//      toggling = true;
+//      toggled = !toggled;
+//    } else if (buttonState == LOW && toggling == true) {
+//      toggling = false;
+//    }
+//
+//    if (toggled) {
       quaternion2rgb();
-    }
-    else {
+//    }
+//    else {
       aaWorld2led();
-    }
+//    }
   }
 
   // reset interrupt flag and get INT_STATUS byte
